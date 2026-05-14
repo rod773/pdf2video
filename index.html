@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF to Video Generator | Complete Working Version</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #a78bfa, #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+        @media (max-width: 900px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .card {
+            background: rgba(255,255,255,0.95);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+        .upload-area {
+            border: 2px dashed #cbd5e1;
+            border-radius: 20px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f8fafc;
+        }
+        .upload-area:hover {
+            border-color: #8b5cf6;
+            background: #f1f5f9;
+        }
+        .file-info {
+            margin-top: 15px;
+            padding: 12px;
+            background: #e2e8f0;
+            border-radius: 12px;
+            font-size: 0.85rem;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 40px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-primary { background: #8b5cf6; color: white; }
+        .btn-primary:hover:not(:disabled) { background: #7c3aed; transform: translateY(-2px); }
+        .btn-success { background: #10b981; color: white; }
+        .btn-success:hover:not(:disabled) { background: #059669; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-secondary { background: #6b7280; color: white; }
+        
+        .speech-controls {
+            background: #f3f4f6;
+            border-radius: 16px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        select, input[type="range"] {
+            width: 100%;
+            padding: 8px 12px;
+            border-radius: 10px;
+            border: 1px solid #d1d5db;
+            margin: 5px 0;
+        }
+        .progress-bar {
+            background: #e2e8f0;
+            border-radius: 20px;
+            height: 8px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            background: #8b5cf6;
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 12px;
+            margin-top: 10px;
+            font-size: 0.8rem;
+        }
+        .status-success { background: #d1fae5; color: #065f46; }
+        .status-error { background: #fee2e2; color: #991b1b; }
+        .status-info { background: #dbeafe; color: #1e40af; }
+        .status-speaking { background: #fef3c7; color: #92400e; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+        
+        .preview-container {
+            margin-top: 20px;
+            text-align: center;
+        }
+        video {
+            width: 100%;
+            max-height: 400px;
+            border-radius: 16px;
+            background: black;
+        }
+        .download-link {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 10px 25px;
+            background: #10b981;
+            color: white;
+            text-decoration: none;
+            border-radius: 40px;
+            font-weight: 600;
+        }
+        .voice-count {
+            font-size: 0.7rem;
+            color: #6b7280;
+            text-align: center;
+            margin-top: 5px;
+        }
+        .info-box {
+            background: #fef3c7;
+            padding: 12px;
+            border-radius: 16px;
+            font-size: 0.7rem;
+            margin-top: 15px;
+        }
+        footer {
+            text-align: center;
+            color: white;
+            margin-top: 30px;
+            opacity: 0.7;
+            font-size: 0.75rem;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 PDF to Video Generator</h1>
+            <p>Upload PDF → Extract text & images → Generate video with narration</p>
+        </div>
+
+        <div class="main-grid">
+            <!-- Left Panel -->
+            <div class="card">
+                <div class="upload-area" id="uploadArea">
+                    <div style="font-size: 48px;">📄</div>
+                    <div><strong>Click or drag PDF here</strong></div>
+                    <div style="font-size: 0.75rem; margin-top: 5px;">Your file stays private</div>
+                    <input type="file" id="pdfInput" accept="application/pdf" style="display: none;">
+                    <button class="btn-primary" onclick="document.getElementById('pdfInput').click()" style="margin-top: 12px;">Choose PDF</button>
+                </div>
+                
+                <div id="fileInfo" class="file-info" style="display: none;">
+                    <div><strong>📄 File:</strong> <span id="fileName"></span></div>
+                    <div><strong>📖 Pages:</strong> <span id="pageCount"></span> pages</div>
+                </div>
+
+                <div class="speech-controls">
+                    <label>🗣️ Voice:</label>
+                    <select id="voiceSelect">
+                        <option>Loading voices...</option>
+                    </select>
+                    <div class="voice-count" id="voiceCount"></div>
+                    
+                    <div style="display: flex; gap: 12px; margin-top: 10px;">
+                        <div style="flex:1">
+                            <label>Speed: <span id="rateVal">1.0</span></label>
+                            <input type="range" id="rateSlider" min="0.5" max="2" step="0.05" value="1.0">
+                        </div>
+                        <div style="flex:1">
+                            <label>Pitch: <span id="pitchVal">1.0</span></label>
+                            <input type="range" id="pitchSlider" min="0.5" max="1.5" step="0.05" value="1.0">
+                        </div>
+                    </div>
+                    <button id="testVoiceBtn" class="btn-secondary" style="width: 100%; margin-top: 10px;">🎤 Test Voice</button>
+                </div>
+
+                <div class="controls">
+                    <button id="loadPdfBtn" class="btn-primary" disabled>📖 Load PDF Pages</button>
+                    <button id="generateBtn" class="btn-success" disabled>🎬 Generate Video</button>
+                    <button id="stopBtn" class="btn-danger" disabled>⏹️ Stop</button>
+                </div>
+
+                <div id="progressSection" style="display: none;">
+                    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+                    <div id="progressText" style="font-size: 0.75rem; text-align: center;"></div>
+                </div>
+
+                <div id="statusMsg" class="status status-info"></div>
+                
+                <div class="info-box">
+                    💡 <strong>How to use:</strong><br>
+                    1. Upload a PDF file<br>
+                    2. Click "Load PDF Pages" (extracts text and images)<br>
+                    3. Click "Test Voice" to check audio<br>
+                    4. Click "Generate Video" - wait for completion<br>
+                    5. Download your video!
+                </div>
+            </div>
+
+            <!-- Right Panel -->
+            <div class="card">
+                <h3 style="margin-bottom: 15px;">🎥 Output Video</h3>
+                <div id="videoContainer" style="display: none;">
+                    <video id="outputVideo" controls style="width: 100%; border-radius: 12px;"></video>
+                    <br>
+                    <a id="downloadLink" class="download-link" download="pdf_video.webm">⬇️ Download Video (WebM)</a>
+                </div>
+                <div id="noVideoMsg" style="color: #94a3b8; text-align: center; padding: 60px 20px;">
+                    Generate a video to see preview
+                </div>
+                
+                <div style="margin-top: 20px; padding: 15px; background: #f1f5f9; border-radius: 16px;">
+                    <h4 style="margin-bottom: 10px;">📋 Text Preview</h4>
+                    <div id="textPreview" style="max-height: 180px; overflow-y: auto; font-size: 0.75rem; font-family: monospace; white-space: pre-wrap;"></div>
+                </div>
+            </div>
+        </div>
+        <footer>⚠️ Generation captures real-time audio. Make sure your speakers work. Large PDFs may take a few minutes.</footer>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+        // DOM elements
+        const pdfInput = document.getElementById('pdfInput');
+        const loadPdfBtn = document.getElementById('loadPdfBtn');
+        const generateBtn = document.getElementById('generateBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const testVoiceBtn = document.getElementById('testVoiceBtn');
+        const voiceSelect = document.getElementById('voiceSelect');
+        const rateSlider = document.getElementById('rateSlider');
+        const pitchSlider = document.getElementById('pitchSlider');
+        const rateVal = document.getElementById('rateVal');
+        const pitchVal = document.getElementById('pitchVal');
+        const voiceCountSpan = document.getElementById('voiceCount');
+        const statusDiv = document.getElementById('statusMsg');
+        const progressSection = document.getElementById('progressSection');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const fileNameSpan = document.getElementById('fileName');
+        const pageCountSpan = document.getElementById('pageCount');
+        const videoContainer = document.getElementById('videoContainer');
+        const outputVideo = document.getElementById('outputVideo');
+        const downloadLink = document.getElementById('downloadLink');
+        const noVideoMsg = document.getElementById('noVideoMsg');
+        const textPreview = document.getElementById('textPreview');
+
+        // State
+        let pdfData = null;
+        let pdfDoc = null;
+        let allTexts = [];
+        let allImages = [];
+        let totalPages = 0;
+        let isGenerating = false;
+        let shouldStop = false;
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let voices = [];
+        let voicesLoaded = false;
+
+        function showStatus(msg, type = 'info') {
+            statusDiv.textContent = msg;
+            statusDiv.className = `status status-${type}`;
+        }
+
+        function updateProgress(percent, text) {
+            progressFill.style.width = `${percent}%`;
+            progressText.textContent = text;
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
+        // Load voices - fixed to avoid loops
+        function loadVoices() {
+            if (!window.speechSynthesis) {
+                voiceSelect.innerHTML = '<option>Speech not supported</option>';
+                return;
+            }
+            
+            function populateVoiceList() {
+                voices = window.speechSynthesis.getVoices();
+                if (voices.length > 0 && !voicesLoaded) {
+                    voicesLoaded = true;
+                    voiceSelect.innerHTML = '';
+                    voices.forEach(voice => {
+                        const option = document.createElement('option');
+                        option.value = voice.name;
+                        option.textContent = `${voice.name} (${voice.lang})`;
+                        voiceSelect.appendChild(option);
+                    });
+                    voiceCountSpan.textContent = `${voices.length} voices available`;
+                    
+                    // Select English voice by default
+                    const englishVoice = voices.find(v => v.lang.startsWith('en'));
+                    if (englishVoice) voiceSelect.value = englishVoice.name;
+                    
+                    showStatus(`✅ ${voices.length} voices loaded. Select one and click "Test Voice".`, 'success');
+                } else if (voices.length === 0) {
+                    voiceSelect.innerHTML = '<option>No voices found</option>';
+                    voiceCountSpan.textContent = '0 voices - check your browser';
+                }
+            }
+            
+            // Try to get voices immediately
+            populateVoiceList();
+            
+            // Also listen for the voiceschanged event (fires when voices are loaded)
+            if (window.speechSynthesis.onvoiceschanged !== undefined) {
+                window.speechSynthesis.onvoiceschanged = populateVoiceList;
+            }
+        }
+
+        // Test voice
+        testVoiceBtn.addEventListener('click', () => {
+            if (!window.speechSynthesis) {
+                showStatus('Speech synthesis not supported', 'error');
+                return;
+            }
+            
+            if (voices.length === 0) {
+                showStatus('No voices available. Please wait or refresh the page.', 'error');
+                return;
+            }
+            
+            window.speechSynthesis.cancel();
+            
+            const testText = "Hello! This is a test of the text to speech system. If you can hear this, your audio is working.";
+            const utterance = new SpeechSynthesisUtterance(testText);
+            
+            const selectedVoice = voices.find(v => v.name === voiceSelect.value);
+            if (selectedVoice) utterance.voice = selectedVoice;
+            utterance.rate = parseFloat(rateSlider.value);
+            utterance.pitch = parseFloat(pitchSlider.value);
+            
+            utterance.onstart = () => showStatus('🔊 Testing voice...', 'speaking');
+            utterance.onend = () => showStatus('✅ Audio working! You can generate video.', 'success');
+            utterance.onerror = () => showStatus('❌ Audio failed. Try another voice.', 'error');
+            
+            window.speechSynthesis.speak(utterance);
+        });
+
+        rateSlider.addEventListener('input', () => rateVal.textContent = rateSlider.value);
+        pitchSlider.addEventListener('input', () => pitchVal.textContent = pitchSlider.value);
+
+        // Render page as image
+        async function renderPageImage(pageNum, scale = 1.5) {
+            const page = await pdfDoc.getPage(pageNum);
+            const viewport = page.getViewport({ scale: scale });
+            const canvas = document.createElement('canvas');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
+            return canvas.toDataURL('image/jpeg', 0.9);
+        }
+
+        // Load PDF content
+        async function loadPDF() {
+            if (!pdfData) {
+                showStatus('Please select a PDF file first', 'error');
+                return;
+            }
+            
+            loadPdfBtn.disabled = true;
+            loadPdfBtn.textContent = '⏳ Loading...';
+            progressSection.style.display = 'block';
+            
+            try {
+                const loadingTask = pdfjsLib.getDocument({ data: pdfData });
+                pdfDoc = await loadingTask.promise;
+                totalPages = pdfDoc.numPages;
+                pageCountSpan.textContent = totalPages;
+                allTexts = [];
+                allImages = [];
+                
+                for (let i = 1; i <= totalPages; i++) {
+                    const page = await pdfDoc.getPage(i);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    allTexts.push(pageText || `[Page ${i} - no text]`);
+                    
+                    const imgUrl = await renderPageImage(i, 1.6);
+                    allImages.push(imgUrl);
+                    
+                    updateProgress((i / totalPages) * 100, `Loaded page ${i}/${totalPages}`);
+                }
+                
+                // Show text preview
+                const previewText = allTexts[0]?.substring(0, 300) + (allTexts[0]?.length > 300 ? '...' : '');
+                textPreview.innerHTML = escapeHtml(previewText) || 'No text extracted';
+                
+                showStatus(`✅ Loaded ${totalPages} pages! Ready to generate video.`, 'success');
+                generateBtn.disabled = false;
+                
+            } catch (err) {
+                showStatus('Error loading PDF: ' + err.message, 'error');
+            } finally {
+                loadPdfBtn.disabled = false;
+                loadPdfBtn.textContent = '📖 Load PDF Pages';
+                setTimeout(() => { progressSection.style.display = 'none'; }, 500);
+            }
+        }
+
+        // Speak text and wait for completion
+        function speakTextAndWait(text, voiceName, rate, pitch) {
+            return new Promise((resolve, reject) => {
+                if (!text || text.trim() === '') {
+                    resolve();
+                    return;
+                }
+                
+                const utterance = new SpeechSynthesisUtterance(text);
+                const selectedVoice = voices.find(v => v.name === voiceName);
+                if (selectedVoice) utterance.voice = selectedVoice;
+                utterance.rate = rate;
+                utterance.pitch = pitch;
+                
+                utterance.onend = () => resolve();
+                utterance.onerror = (e) => reject(new Error('Speech error'));
+                
+                window.speechSynthesis.speak(utterance);
+            });
+        }
+
+        // Draw image on canvas
+        function drawImageOnCanvas(canvas, imgUrl, width, height) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillRect(0, 0, width, height);
+                    
+                    const scale = Math.min(width / img.width, height / img.height);
+                    const dw = img.width * scale;
+                    const dh = img.height * scale;
+                    const dx = (width - dw) / 2;
+                    const dy = (height - dh) / 2;
+                    ctx.drawImage(img, dx, dy, dw, dh);
+                    
+                    // Add page number
+                    ctx.font = 'bold 18px system-ui';
+                    ctx.fillStyle = '#333333';
+                    ctx.shadowBlur = 0;
+                    ctx.fillText(`Page ${currentPageNum}`, width - 100, 45);
+                    
+                    resolve();
+                };
+                img.src = imgUrl;
+            });
+        }
+        
+        let currentPageNum = 0;
+
+        // Generate video
+        async function generateVideo() {
+            if (allImages.length === 0) {
+                showStatus('Please load PDF pages first', 'error');
+                return;
+            }
+            if (voices.length === 0) {
+                showStatus('No voices available. Click "Test Voice" first.', 'error');
+                return;
+            }
+            
+            isGenerating = true;
+            shouldStop = false;
+            generateBtn.disabled = true;
+            stopBtn.disabled = false;
+            loadPdfBtn.disabled = true;
+            generateBtn.textContent = '⏳ Generating...';
+            recordedChunks = [];
+            videoContainer.style.display = 'none';
+            noVideoMsg.style.display = 'block';
+            
+            const fps = 24;
+            const width = 1280;
+            const height = 720;
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            
+            const stream = canvas.captureStream(fps);
+            mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+            recordedChunks = [];
+            
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+            
+            let recordingComplete = new Promise((resolve) => {
+                mediaRecorder.onstop = () => resolve();
+            });
+            
+            mediaRecorder.start();
+            showStatus('🎥 Recording started...', 'speaking');
+            progressSection.style.display = 'block';
+            
+            try {
+                for (let i = 0; i < totalPages; i++) {
+                    if (shouldStop) {
+                        showStatus('Generation stopped', 'info');
+                        break;
+                    }
+                    
+                    currentPageNum = i + 1;
+                    updateProgress((i / totalPages) * 100, `Processing page ${i+1}/${totalPages}...`);
+                    showStatus(`🔊 Reading page ${i+1}/${totalPages}...`, 'speaking');
+                    
+                    // Draw the page image
+                    await drawImageOnCanvas(canvas, allImages[i], width, height);
+                    
+                    // Small delay to ensure frame is captured
+                    await new Promise(r => setTimeout(r, 200));
+                    
+                    // Speak the text while showing the page
+                    await speakTextAndWait(allTexts[i], voiceSelect.value, parseFloat(rateSlider.value), parseFloat(pitchSlider.value));
+                    
+                    // Pause between pages
+                    await new Promise(r => setTimeout(r, 300));
+                }
+                
+                // Stop recording
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                }
+                await recordingComplete;
+                
+                // Create video
+                const videoBlob = new Blob(recordedChunks, { type: 'video/webm' });
+                const videoUrl = URL.createObjectURL(videoBlob);
+                outputVideo.src = videoUrl;
+                downloadLink.href = videoUrl;
+                videoContainer.style.display = 'block';
+                noVideoMsg.style.display = 'none';
+                
+                const sizeMB = (videoBlob.size / 1024 / 1024).toFixed(2);
+                showStatus(`✅ Video complete! Size: ${sizeMB} MB. Click download.`, 'success');
+                updateProgress(100, 'Done!');
+                
+            } catch (err) {
+                showStatus('Error: ' + err.message, 'error');
+                if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+            } finally {
+                isGenerating = false;
+                generateBtn.disabled = false;
+                stopBtn.disabled = true;
+                loadPdfBtn.disabled = false;
+                generateBtn.textContent = '🎬 Generate Video';
+                window.speechSynthesis.cancel();
+                setTimeout(() => { progressSection.style.display = 'none'; }, 1000);
+            }
+        }
+
+        // Stop generation
+        stopBtn.addEventListener('click', () => {
+            if (isGenerating) {
+                shouldStop = true;
+                window.speechSynthesis.cancel();
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                }
+                showStatus('Stopping...', 'info');
+            }
+        });
+
+        // Load PDF button
+        loadPdfBtn.addEventListener('click', loadPDF);
+        generateBtn.addEventListener('click', generateVideo);
+
+        // File upload
+        pdfInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file || file.type !== 'application/pdf') {
+                showStatus('Please select a PDF file', 'error');
+                return;
+            }
+            
+            fileNameSpan.textContent = file.name;
+            document.getElementById('fileInfo').style.display = 'block';
+            showStatus(`Loading "${file.name}"...`, 'info');
+            
+            pdfData = await file.arrayBuffer();
+            loadPdfBtn.disabled = false;
+            showStatus(`✅ "${file.name}" loaded. Click "Load PDF Pages".`, 'success');
+        });
+
+        // Drag and drop
+        const uploadArea = document.getElementById('uploadArea');
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#8b5cf6';
+        });
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.style.borderColor = '#cbd5e1';
+        });
+        uploadArea.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#cbd5e1';
+            const file = e.dataTransfer.files[0];
+            if (file && file.type === 'application/pdf') {
+                pdfInput.files = e.dataTransfer.files;
+                pdfInput.dispatchEvent(new Event('change'));
+            } else {
+                showStatus('Please drop a PDF file', 'error');
+            }
+        });
+
+        // Initialize voices once on page load
+        loadVoices();
+        showStatus('📂 Ready! 1. Upload PDF 2. Load PDF Pages 3. Test Voice 4. Generate Video', 'info');
+    </script>
+</body>
+</html>
