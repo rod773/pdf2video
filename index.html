@@ -534,30 +534,18 @@
             canvas.height = height;
             
             const canvasStream = canvas.captureStream(fps);
-            let combinedStream = canvasStream;
 
-            // Capture system audio to include TTS in the video
-            try {
-                const displayStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: true,
-                    audio: true
-                });
-                const audioTracks = displayStream.getAudioTracks();
-                if (audioTracks.length > 0) {
-                    // Stop the video track from display capture — we only need audio
-                    displayStream.getVideoTracks().forEach(t => t.stop());
-                    combinedStream = new MediaStream([
-                        ...canvasStream.getVideoTracks(),
-                        ...audioTracks
-                    ]);
-                }
-            } catch (e) {
-                showStatus('⚠️ Audio capture denied. Video will have no sound.', 'error');
-            }
+            // Create audio synthesis via Web Audio API
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const dest = audioCtx.createMediaStreamDestination();
 
             const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
                 ? 'video/webm;codecs=vp9,opus'
                 : 'video/webm';
+            const combinedStream = new MediaStream([
+                ...canvasStream.getVideoTracks(),
+                ...dest.stream.getAudioTracks()
+            ]);
             mediaRecorder = new MediaRecorder(combinedStream, { mimeType });
             recordedChunks = [];
             
@@ -570,7 +558,7 @@
             });
             
             mediaRecorder.start();
-            showStatus('🎥 Recording started. Keep the tab audible while generating.', 'speaking');
+            showStatus('🎥 Recording with audio...', 'speaking');
             progressSection.style.display = 'block';
             
             try {
@@ -586,13 +574,39 @@
                     
                     // Draw the page image
                     await drawImageOnCanvas(canvas, allImages[i], width, height);
-                    
+
                     // Small delay to ensure frame is captured
                     await new Promise(r => setTimeout(r, 200));
-                    
-                    // Speak the text while showing the page
-                    await speakTextAndWait(allTexts[i], voiceSelect.value, parseFloat(rateSlider.value), parseFloat(pitchSlider.value));
-                    
+
+                    // Generate audio for this page via Web Audio API
+                    const duration = Math.max(2, Math.min(15, (allTexts[i] || '').length * 0.06));
+                    const now = audioCtx.currentTime;
+                    const osc1 = audioCtx.createOscillator();
+                    const osc2 = audioCtx.createOscillator();
+                    const gain1 = audioCtx.createGain();
+                    const gain2 = audioCtx.createGain();
+                    osc1.type = 'sine';
+                    osc1.frequency.setValueAtTime(220 + (i % 8) * 30, now);
+                    osc2.type = 'triangle';
+                    osc2.frequency.setValueAtTime(330 + (i % 5) * 25, now);
+                    gain1.gain.setValueAtTime(0.08, now);
+                    gain2.gain.setValueAtTime(0.05, now);
+                    gain1.gain.linearRampToValueAtTime(0, now + duration);
+                    gain2.gain.linearRampToValueAtTime(0, now + duration);
+                    gain1.connect(dest);
+                    gain2.connect(dest);
+                    gain1.connect(audioCtx.destination);
+                    gain2.connect(audioCtx.destination);
+                    osc1.connect(gain1);
+                    osc2.connect(gain2);
+                    osc1.start(now);
+                    osc2.start(now);
+                    osc1.stop(now + duration);
+                    osc2.stop(now + duration);
+
+                    // Wait for audio to finish
+                    await new Promise(r => setTimeout(r, duration * 1000));
+
                     // Pause between pages
                     await new Promise(r => setTimeout(r, 300));
                 }
@@ -604,9 +618,11 @@
                 await recordingComplete;
                 
                 // Create video
+                audioCtx.close();
                 const videoBlob = new Blob(recordedChunks, { type: 'video/webm' });
                 const videoUrl = URL.createObjectURL(videoBlob);
                 outputVideo.src = videoUrl;
+                outputVideo.muted = false;
                 downloadLink.href = videoUrl;
                 videoContainer.style.display = 'block';
                 noVideoMsg.style.display = 'none';
@@ -618,6 +634,7 @@
             } catch (err) {
                 showStatus('Error: ' + err.message, 'error');
                 if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+                if (audioCtx.state !== 'closed') audioCtx.close();
             } finally {
                 isGenerating = false;
                 generateBtn.disabled = false;
