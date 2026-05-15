@@ -533,8 +533,32 @@
             canvas.width = width;
             canvas.height = height;
             
-            const stream = canvas.captureStream(fps);
-            mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+            const canvasStream = canvas.captureStream(fps);
+            let combinedStream = canvasStream;
+
+            // Capture system audio to include TTS in the video
+            try {
+                const displayStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: true,
+                    audio: true
+                });
+                const audioTracks = displayStream.getAudioTracks();
+                if (audioTracks.length > 0) {
+                    // Stop the video track from display capture — we only need audio
+                    displayStream.getVideoTracks().forEach(t => t.stop());
+                    combinedStream = new MediaStream([
+                        ...canvasStream.getVideoTracks(),
+                        ...audioTracks
+                    ]);
+                }
+            } catch (e) {
+                showStatus('⚠️ Audio capture denied. Video will have no sound.', 'error');
+            }
+
+            const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+                ? 'video/webm;codecs=vp9,opus'
+                : 'video/webm';
+            mediaRecorder = new MediaRecorder(combinedStream, { mimeType });
             recordedChunks = [];
             
             mediaRecorder.ondataavailable = (e) => {
@@ -546,7 +570,7 @@
             });
             
             mediaRecorder.start();
-            showStatus('🎥 Recording started...', 'speaking');
+            showStatus('🎥 Recording started. Keep the tab audible while generating.', 'speaking');
             progressSection.style.display = 'block';
             
             try {
